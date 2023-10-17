@@ -21,7 +21,7 @@
 
 import sys; sys.path.insert(0, ".")
 
-from det3d.models.backbones.scn import SpMiddleResNetFHD
+from models import SpMiddleResNetFHD
 import torch
 import pickle
 import argparse

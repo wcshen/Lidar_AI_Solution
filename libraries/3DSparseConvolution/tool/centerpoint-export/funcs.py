@@ -21,10 +21,10 @@
 
 import torch
 import collections
-from det3d.models.backbones.scn import SpMiddleResNetFHD
+from models import SpMiddleResNetFHD
 from spconv.pytorch import SparseSequential
 from spconv.pytorch import conv
-from det3d.models.backbones.scn import SparseBasicBlock
+from models import SparseBasicBlock
 import cumm.tensorview as tv
 import numpy as np
 

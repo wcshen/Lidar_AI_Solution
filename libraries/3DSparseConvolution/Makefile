@@ -19,6 +19,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# modify this
+CUDA_HOME=/home/swc/software/cuda11_4
 optimize  := -O3
 cc        := g++
 stdcpp    := c++11
