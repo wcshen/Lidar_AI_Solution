@@ -48,6 +48,14 @@ CUDA & TensorRT solution for [pointpillars](https://arxiv.org/abs/1812.05784) in
 - **Postprocess**: Parse bounding box, class type and direction
 - **Easy To Use**: Preparation, inference, evaluation all in one to reproduce torch Impl accuracy.
 
+## CUDA-V2XFusion
+Training and inference solutions for V2XFusion.
+- **Easy To Use**: Provides easily reproducible solutions for training, quantization, and ONNX export.
+- **Quantification friendly**：PointPillars based backbone with pre-normalization which can reduce quantization error.
+- **Feature Fusion**: Camera & Lidar feature fuser and onnx export solution.
+- **PTQ**: Quantization solutions for V2XFusion, easy to understand.
+- **Sparsity**: 4:2 structural sparsity support. 
+- **Deepstream sample**: Sample inference using CUDA, TensorRT/Triton in NVIDIA DeepStream SDK 7.0.
 
 ## cuOSD(CUDA On-Screen Display Library)
 Draw all elements using a single CUDA kernel.
@@ -61,7 +69,7 @@ Draw all elements using a single CUDA kernel.
 - **Clock:** Time plotting based on text support
 
 ## cuPCL(CUDA Point Cloud Library)
-Provide several GPU accelerated Point Cloud operations with high accuracy and high perfomrance at the same time: cuICP, cuFilter, cuSegmentation, cuOctree, cuCluster, cuNDT, Voxelization(incoming).
+Provide several GPU accelerated Point Cloud operations with high accuracy and high performance at the same time: cuICP, cuFilter, cuSegmentation, cuOctree, cuCluster, cuNDT, Voxelization(incoming).
 - **cuICP:** CUDA accelerated iterative corresponding point vertex cloud(point-to-point) registration implementation.
 - **cuFilter:** Support CUDA accelerated features: PassThrough and VoxelGrid.
 - **cuSegmentation:** Support CUDA accelerated features: RandomSampleConsensus with a plane model.

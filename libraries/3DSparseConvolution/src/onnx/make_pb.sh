@@ -9,7 +9,17 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-protoc=protoc
-mkdir pbout
+project_folder=$(realpath $(dirname ${BASH_SOURCE[-1]}))
+cd $project_folder
+
+# if /usr/bin/protoc not exists, please try to run: sudo apt install protobuf-compiler -y
+protoc=/usr/bin/protoc
+mkdir -p pbout
 $protoc onnx-ml.proto --cpp_out=pbout
 $protoc onnx-operators-ml.proto --cpp_out=pbout
+
+mv pbout/onnx-ml.pb.cc onnx-ml.pb.cpp
+mv pbout/onnx-operators-ml.pb.cc onnx-operators-ml.pb.cpp
+mv pbout/*.h ./
+
+rm -rf pbout

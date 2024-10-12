@@ -30,6 +30,18 @@
 
 namespace spconv{
 
+#define LOGV(fmt, ...)                                         \
+  do {                                                         \
+    if (get_verbose()) {                                           \
+      printf("\033[33m[Verb🚩]\033[0m " fmt "\n", __VA_ARGS__); \
+    }                                                          \
+  } while (0)
+
+#define LOGERR(fmt, ...)                                        \
+  do {                                                          \
+    printf("\033[31m[Erro❌ ]\033[0m " fmt "\n", __VA_ARGS__);   \
+  } while (0)
+
 struct ParameterFP16Data{
     std::vector<unsigned short> data;
     std::vector<int> shape;
@@ -41,14 +53,14 @@ static onnx::TensorProto get_initializer(const onnx::GraphProto& graph, const st
         if (init.name() == name) 
             return init;
     }
-    printf("Can not find initializer '%s' in ONNX.\n", name.c_str());
+    LOGERR("Can not find initializer '%s' in ONNX.", name.c_str());
     return onnx::TensorProto();
 };
 
 static ParameterFP16Data get_initializer_data(const onnx::GraphProto& graph, const std::string& name) {
     auto proto = get_initializer(graph, name);
     if(proto.data_type() != onnx::TensorProto_DataType_FLOAT16){
-        printf("Can not support non float data type[%d] for initializer data.\n", proto.data_type());
+        LOGERR("Can not support non float data type[%d] for initializer data.", proto.data_type());
         return ParameterFP16Data();
     }
 
@@ -58,7 +70,7 @@ static ParameterFP16Data get_initializer_data(const onnx::GraphProto& graph, con
 
     size_t volumn = std::accumulate(output.shape.begin(), output.shape.end(), 1ul, std::multiplies<int64_t>());
     if(volumn * sizeof(unsigned short) != proto.raw_data().size()){
-        printf("Invalid parameter data size.\n");
+        LOGERR("Invalid parameter data size. %ld != %ld", volumn * sizeof(unsigned short), proto.raw_data().size());
         return ParameterFP16Data();
     }
     unsigned short* pdata = (unsigned short*)proto.raw_data().data();
@@ -72,7 +84,7 @@ static onnx::AttributeProto get_attribute(const onnx::NodeProto& node, const std
         if (attr.name() == name) 
             return attr;
     }
-    printf("Can not find attribute '%s' in node '%s', it will use the default value of.\n",
+    LOGV("Can not find the attribute '%s' in the node '%s', the default value will be used.",
         name.c_str(), node.name().c_str());
     return onnx::AttributeProto();
 };
@@ -85,12 +97,14 @@ static std::vector<int> get_attribute_as_intarray(const onnx::NodeProto& node, c
     return output;
 };
 
-std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Precision precision, bool mark_all_output){
+std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Precision precision, void* stream, bool mark_all_output){
+
+    LOGV("Load onnx from: %s", onnx_file.c_str());
 
     onnx::ModelProto model;
     std::fstream fin(onnx_file, std::ios::binary | std::ios::in);
     if (!model.ParseFromIstream(&fin)) {
-        printf("Parse onnx failed.\n");
+        LOGV("Parse onnx failed: %s", onnx_file.c_str());
         return nullptr;
     }
 
@@ -100,7 +114,7 @@ std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Prec
     std::unordered_map<std::string, spconv::ITensor*> tensor_map_by_name;
     for (int i = 0; i < graph.input_size(); ++i) {
         auto name = graph.input(i).name();
-        tensor_map_by_name[name] = builder->push_input(name);
+        tensor_map_by_name[name] = builder->push_input(name.c_str());
     }
 
     std::vector<spconv::ITensor*> collect_outputs;
@@ -116,11 +130,11 @@ std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Prec
                 std::vector<float>(weight_dynamic_ranges_proto.floats().begin(), weight_dynamic_ranges_proto.floats().end());
 
             auto n = builder->push_sparse_conv(
-                node.name(), x, 
+                node.name().c_str(), x, 
                 weight.data, weight.shape,
                 weight_dynamic_ranges,
                 bias.data, bias.shape,
-                get_attribute(node, "activation").s(),
+                get_attribute(node, "activation").s().c_str(),
                 get_attribute_as_intarray(node, "kernel_size"),
                 get_attribute_as_intarray(node, "stride"),
                 get_attribute_as_intarray(node, "padding"),
@@ -128,10 +142,11 @@ std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Prec
                 get_attribute(node, "input_dynamic_range").f(),
                 get_attribute(node, "subm").i(),
                 get_attribute(node, "output_bound").i(),
-                get_attribute(node, "rulebook").s(),
+                get_attribute(node, "rulebook").s().c_str(),
                 get_attribute(node, "precision").s() == "int8" ? Precision::Int8 : Precision::Float16,
                 get_attribute(node, "output_precision").s() == "int8" ? Precision::Int8 : Precision::Float16,
-                node.output(0)
+                node.output(0).c_str(),
+                get_attribute(node, "inverse").i()
             );
 
             if(mark_all_output){
@@ -143,37 +158,39 @@ std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Prec
             auto b = tensor_map_by_name[node.input(1)];
 
             auto n = builder->push_add(
-                node.name(),
+                node.name().c_str(),
                 a, b, 
                 get_attribute(node, "input0_dynamic_range").f(),
                 get_attribute(node, "input1_dynamic_range").f(),
-                node.output(0), 
+                node.output(0).c_str(), 
                 get_attribute(node, "precision").s() == "int8" ? Precision::Int8 : Precision::Float16,
                 get_attribute(node, "output_precision").s() == "int8" ? Precision::Int8 : Precision::Float16
             );
             tensor_map_by_name[node.output(0)] = n->output(0);
         } else if (node.op_type() == "Relu") {
             auto x = tensor_map_by_name[node.input(0)];
-            auto n = builder->push_relu(node.name(), x, node.output(0));
+            auto n = builder->push_relu(node.name().c_str(), x, node.output(0).c_str());
             tensor_map_by_name[node.output(0)] = n->output(0);
         } else if (node.op_type() == "ScatterDense") {
             auto x = tensor_map_by_name[node.input(0)];
             auto input_spatial_shape = get_attribute_as_intarray(node, "input_spatial_shape");
             auto output_shape = get_attribute_as_intarray(node, "output_shape");
             auto format = get_attribute(node, "format").s();
-            auto n = builder->push_dense(node.name(), x, format, node.output(0), input_spatial_shape, output_shape);
+            auto input_dynamic_range = get_attribute(node, "input_dynamic_range").f();
+            auto layout = get_attribute(node, "output_layout").s() == "NCHW32" ? spconv::TensorLayout::NCHW32 : spconv::TensorLayout::NCHW;
+            auto n = builder->push_dense(node.name().c_str(), x, format.c_str(), node.output(0).c_str(), input_spatial_shape, output_shape, layout, input_dynamic_range);
             tensor_map_by_name[node.output(0)] = n->output(0);
         } else if (node.op_type() == "Reshape") {
             auto x = tensor_map_by_name[node.input(0)];
             auto dims = get_attribute(node, "dims");
             std::vector<int64_t> shape(dims.ints().begin(), dims.ints().end());
-            auto n = builder->push_reshape(node.name(), x, shape, node.output(0));
+            auto n = builder->push_reshape(node.name().c_str(), x, shape, node.output(0).c_str());
             tensor_map_by_name[node.output(0)] = n->output(0);
         } else if (node.op_type() == "Transpose") {
             auto x = tensor_map_by_name[node.input(0)];
             auto dims = get_attribute(node, "dims");
             std::vector<int64_t> shape(dims.ints().begin(), dims.ints().end());
-            auto n = builder->push_transpose(node.name(), x, shape, node.output(0));
+            auto n = builder->push_transpose(node.name().c_str(), x, shape, node.output(0).c_str());
             tensor_map_by_name[node.output(0)] = n->output(0);
         } else {
             printf("Unsupport operator [%s]\b", node.op_type().c_str());
@@ -189,6 +206,6 @@ std::shared_ptr<Engine> load_engine_from_onnx(const std::string& onnx_file, Prec
     for (int i = 0; i < collect_outputs.size(); ++i) {
         builder->push_output(collect_outputs[i]);
     }
-    return builder->build(precision);
+    return builder->build(precision, stream);
 }
 };
